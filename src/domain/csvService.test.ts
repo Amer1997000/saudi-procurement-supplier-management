@@ -1,0 +1,12 @@
+import{describe,expect,it}from'vitest'
+import{cloneDemoWorkspace}from'../data/demoData'
+import{CSV_MAX_ROWS,exportRequisitionsCsv,exportSuppliersCsv,importRequisitionsCsv,importSuppliersCsv,parseCsv,requisitionTemplate,supplierTemplate}from'./csvService'
+const options={id:(()=>{let n=0;return()=>`CSV${++n}`})(),now:()=> '2026-11-18T09:00:00.000Z'}
+describe('procurement CSV',()=>{
+ it('parses quotes and rejects malformed quotes',()=>{expect(parseCsv('a,b\r\n"x,y","z""q"')).toEqual([['a','b'],['x,y','z"q']]);expect(()=>parseCsv('a\n"broken')).toThrow('Malformed CSV')})
+ it('partially accepts valid suppliers and reports invalid rows',()=>{const csv=supplierTemplate()+'Synthetic Supply One,Riyadh,Office Supplies,Demo Desk,desk@supply-one.invalid,30,5,Active\r\nBroken,Jeddah,Bad Category,Desk,not-real,abc,5,Active';const ws=cloneDemoWorkspace(),result=importSuppliersCsv(ws,csv,options);expect(result.accepted).toBe(1);expect(result.errors).toHaveLength(1);expect(result.workspace.suppliers).toHaveLength(ws.suppliers.length+1)})
+ it('partially accepts requisitions and validates relationships',()=>{const csv=requisitionTemplate()+'MED,FAC,nawaf.alharbi@tawreed.invalid,2027-03-01,Synthetic facilities requirement,Inspection service,Facilities Services,1,service,8000,true\r\nBAD,FAC,nawaf.alharbi@tawreed.invalid,2027-03-01,Invalid branch requirement,Item,Office Supplies,1,unit,10,false';const result=importRequisitionsCsv(cloneDemoWorkspace(),csv,options);expect(result.accepted).toBe(1);expect(result.errors[0].field).toBe('relationship')})
+ it('reports duplicates without merging',()=>{const csv=supplierTemplate()+'Najd Digital Equipment Co.,Riyadh,IT Equipment,Other Desk,other@najd.invalid,30,12,Active';const ws=cloneDemoWorkspace(),result=importSuppliersCsv(ws,csv,options);expect(result.accepted).toBe(0);expect(result.warnings).toHaveLength(1);expect(result.workspace.suppliers).toHaveLength(ws.suppliers.length)})
+ it('enforces row limits',()=>{const text=supplierTemplate()+Array.from({length:CSV_MAX_ROWS+1},()=>'Synthetic,,,,,,,').join('\n');expect(importSuppliersCsv(cloneDemoWorkspace(),text,options).errors[0].message).toContain('5,000')})
+ it('neutralizes spreadsheet formulas on export',()=>{const ws=cloneDemoWorkspace();ws.suppliers[0]={...ws.suppliers[0],legalName:'=HYPERLINK("https://invalid.example")'};expect(exportSuppliersCsv(ws)).toContain("'=HYPERLINK");ws.requisitions[0].justification='+CMD';expect(exportRequisitionsCsv(ws)).toContain("'+CMD")})
+})

@@ -1,0 +1,13 @@
+import{describe,expect,it}from'vitest'
+import{cloneDemoWorkspace,demoWorkspace}from'../data/demoData'
+import{calculateAnalytics}from'./analytics'
+describe('procurement analytics',()=>{
+ it('reconciles original financial stages',()=>expect(calculateAnalytics(demoWorkspace)).toMatchObject({committed:230000,committedVat:34500,committedGross:264500,received:200000,invoiced:207200,outstanding:30000,poCount:3}))
+ it('calculates delivery, rejection, cycle and exception denominators',()=>{const x=calculateAnalytics(demoWorkspace);expect(x.onTimeRate).toBe(50);expect(x.lateDeliveries).toBe(1);expect(x.rejectedQuantity).toBe(2);expect(x.rejectionRate).toBeCloseTo(9.09);expect(x.cycleDays).toBeGreaterThan(0);expect(x.invoiceExceptionRate).toBeCloseTo(33.33)})
+ it('calculates RFQ participation and supplier concentration',()=>{const x=calculateAnalytics(demoWorkspace);expect(x.rfqParticipationRate).toBe(100);expect(x.supplierConcentration).toBeCloseTo(52.17);expect(x.supplierPerformance).toHaveLength(3)})
+ it('applies branch, department, supplier and category filters consistently',()=>{expect(calculateAnalytics(demoWorkspace,{branchId:'BR-JED'}).committed).toBe(60000);expect(calculateAnalytics(demoWorkspace,{departmentId:'DEP-OPS'}).committed).toBe(120000);expect(calculateAnalytics(demoWorkspace,{supplierId:'SUP-001'}).committed).toBe(50000);expect(calculateAnalytics(demoWorkspace,{category:'Furniture'}).committed).toBe(60000)})
+ it('applies date and status filters',()=>{expect(calculateAnalytics(demoWorkspace,{dateFrom:'2026-10-01',dateTo:'2026-10-31'}).poCount).toBe(2);expect(calculateAnalytics(demoWorkspace,{status:'Partially Received'}).committed).toBe(60000)})
+ it('excludes cancelled transactions',()=>{const w=cloneDemoWorkspace();w.purchaseOrders[0].status='Cancelled';expect(calculateAnalytics(w).committed).toBe(180000)})
+ it('uses partial receipts, returns and service acceptance without double counting',()=>{const w=cloneDemoWorkspace();w.goodsReceipts.push({id:'R',receiptNumber:'R',purchaseOrderId:'PO-002',deliveryReference:'RETURN: test',receiptDate:'2026-11-12',receiverId:'USR-REC',createdAt:'2026-11-12',lines:[{id:'RL',purchaseOrderLineId:'POL-002',deliveredQuantity:0,acceptedQuantity:0,rejectedQuantity:0,returnedQuantity:2}]});expect(calculateAnalytics(w).received).toBe(194000)})
+ it('returns unavailable rates for zero denominators and handles missing dates',()=>{const w=cloneDemoWorkspace();w.purchaseOrders=[];w.goodsReceipts=[];w.invoices=[];w.rfqs=[];const x=calculateAnalytics(w);expect(x.onTimeRate).toBeNull();expect(x.invoiceExceptionRate).toBeNull();expect(x.rfqParticipationRate).toBeNull();expect(x.cycleDays).toBeNull()})
+})

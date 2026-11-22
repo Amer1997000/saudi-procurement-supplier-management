@@ -1,0 +1,4 @@
+import{describe,expect,it}from'vitest'
+import{demoWorkspace}from'../data/demoData'
+import{calculateDashboard}from'./dashboard'
+describe('executive dashboard',()=>{it('reconciles pre-VAT management values and gross document totals',()=>{const result=calculateDashboard(demoWorkspace);expect(result).toMatchObject({totalRequisitions:5,pendingApprovals:1,openPurchaseOrders:1,requestedPreVatSar:400000,approvedPreVatSar:230000,committedPreVatSar:230000,committedVatSar:34500,committedDocumentTotalSar:264500,receivedPreVatSar:200000,invoicedPreVatSar:207200,invoicedVatSar:31080,invoicedDocumentTotalSar:238280,invoiceExceptions:1});expect(result.committedPreVatSar).toBe(result.approvedPreVatSar);expect(result.committedDocumentTotalSar-result.committedPreVatSar).toBe(result.committedVatSar);expect(result.invoiceExceptionRate).toBeCloseTo(1/3)})})
